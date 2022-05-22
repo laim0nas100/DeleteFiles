@@ -1,22 +1,12 @@
 package lt.lb.deletefiles;
 
 import java.io.IOException;
-import java.nio.file.FileVisitOption;
-import java.nio.file.FileVisitResult;
-import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
 
 /**
  *
@@ -24,7 +14,7 @@ import java.util.Set;
  */
 public class DeleteFiles {
 
-    static boolean DEBUG = false;
+    public static boolean DEBUG = false;
 
     public static void printUsage() {
         System.out.println("Expecting 2 arguments, [days:int] [dir:string]");
@@ -68,59 +58,21 @@ public class DeleteFiles {
         return time.toInstant().isBefore(test);
     }
 
-    public static class DirStream implements FileVisitor<Path>, Iterable<Path> {
-
-        private static final Set<FileVisitOption> emptyOptions = new HashSet<>();
-        private List<Path> visited = new ArrayList<>();
-        private int deleted;
-
-        public DirStream(Path path) throws IOException {
-            Files.walkFileTree(Objects.requireNonNull(path), emptyOptions, 1, this);
-        }
-
-        public boolean deletedMatchVisited() {
-            return deleted == visited.size();
-        }
-
-        public void incrementDeleted() {
-            deleted++;
-        }
-
-        @Override
-        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-            return FileVisitResult.CONTINUE;
-        }
-
-        @Override
-        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-            visited.add(file);
-            return FileVisitResult.CONTINUE;
-        }
-
-        @Override
-        public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
-            return FileVisitResult.CONTINUE;
-        }
-
-        @Override
-        public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-            return FileVisitResult.CONTINUE;
-        }
-
-        @Override
-        public Iterator<Path> iterator() {
-            return visited.iterator();
-        }
-
-    }
-
-    public static boolean doDelete(Path p) throws IOException {
+    public static boolean doDelete(Path p) {
         boolean deleted = false;
         if (!DEBUG) {
-            deleted = Files.deleteIfExists(p);
+            try{
+               Files.delete(p);
+               deleted = true;
+            }catch (Exception ex){
+                System.err.println(ex);
+            }
         }
-        System.out.println(p);
-        return DEBUG || deleted;
+        if(DEBUG || deleted){
+            System.out.println(p);
+            return true;
+        }
+        return false;
     }
 
     public static void deleteStart(Path p, Instant maxTime) throws IOException {
