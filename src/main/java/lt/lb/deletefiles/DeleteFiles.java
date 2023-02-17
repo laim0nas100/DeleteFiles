@@ -7,6 +7,8 @@ import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  *
@@ -15,38 +17,58 @@ import java.time.ZonedDateTime;
 public class DeleteFiles {
 
     public static boolean DEBUG = false;
+    
+    public static void prinUsageExit(){
+        printUsage();
+        try{
+            Thread.sleep(1000);
+        }catch(InterruptedException ex){
+            
+        }
+        
+        System.exit(1);
+    }
 
     public static void printUsage() {
-        System.out.println("Expecting 2 arguments, [days:int] [dir:string]");
+        System.out.println("Expecting 2 (or more) arguments, [days:int] [dirs:string]...");
         System.out.println("days: how old the last modification must be to be allowed for deletion");
-        System.out.println("dir: directory to scan recursively for file deletion");
+        System.out.println("dirs: directories to scan recursively for file deletion");
+        
     }
 
     public static void main(String[] args) throws Exception {
 
         if (args.length < 2) {
-            printUsage();
+            prinUsageExit();
+            return;
         }
 
         int days = 30;
-        Path dir = null;
-        if (args.length >= 1) {
+        List<Path> dirs = new ArrayList<>();
+        if (args.length > 1) {
             try {
                 days = Integer.parseInt(args[0]);
-                dir = Paths.get(args[1]);
+                for (int i = 1; i < args.length; i++) {
+                    dirs.add(Paths.get(args[i]));
+                }
             } catch (Exception ex) {
-                printUsage();
                 System.out.println("Error:" + ex.getMessage());
-                return;
+                prinUsageExit();
             }
         }
 
-        System.out.println("Deleting files older than: " + days + " days at: " + dir);
-
-        deleteStart(dir, ZonedDateTime.now()
+        if (dirs.isEmpty()) {
+            prinUsageExit();
+        }
+        Instant time = ZonedDateTime.now()
                 .minusDays(days)
-                .toInstant()
-        );
+                .toInstant();
+
+        for (Path dir : dirs) {
+            System.out.println("Deleting files older than: " + days + " days at: " + dir);
+            deleteStart(dir, time);
+        }
+        Thread.sleep(1000);
 
     }
 
@@ -61,14 +83,14 @@ public class DeleteFiles {
     public static boolean doDelete(Path p) {
         boolean deleted = false;
         if (!DEBUG) {
-            try{
-               Files.delete(p);
-               deleted = true;
-            }catch (Exception ex){
+            try {
+                Files.delete(p);
+                deleted = true;
+            } catch (Exception ex) {
                 System.err.println(ex);
             }
         }
-        if(DEBUG || deleted){
+        if (DEBUG || deleted) {
             System.out.println(p);
             return true;
         }
