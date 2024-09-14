@@ -22,18 +22,18 @@ public class DirStream implements FileVisitor<Path>, Iterable<Path> {
 
     private static final Set<FileVisitOption> emptyOptions = new HashSet<>();
     private List<Path> visited = new ArrayList<>();
-    private int deleted;
+    private int counter;
 
     public DirStream(Path path) throws IOException {
         Files.walkFileTree(Objects.requireNonNull(path), emptyOptions, 1, this);
     }
 
-    public boolean deletedMatchVisited() {
-        return deleted == visited.size();
+    public boolean counterMatchVisited() {
+        return counter == visited.size();
     }
 
-    public void incrementDeleted() {
-        deleted++;
+    public void incrementCounter() {
+        counter++;
     }
 
     @Override

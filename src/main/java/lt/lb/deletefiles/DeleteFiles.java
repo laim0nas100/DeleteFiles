@@ -17,23 +17,28 @@ import java.util.List;
 public class DeleteFiles {
 
     public static boolean DEBUG = false;
-    
-    public static void prinUsageExit(){
+
+    private static final String SUFFIX = "_2BREMOVED";
+
+    public static void prinUsageExit() {
         printUsage();
-        try{
+        try {
             Thread.sleep(1000);
-        }catch(InterruptedException ex){
-            
+        } catch (InterruptedException ex) {
+
         }
-        
+
         System.exit(1);
     }
+
+    public static long totalMarked = 0;
+    public static long totalDeleted = 0;
 
     public static void printUsage() {
         System.out.println("Expecting 2 (or more) arguments, [days:int] [dirs:string]...");
         System.out.println("days: how old the last modification must be to be allowed for deletion");
         System.out.println("dirs: directories to scan recursively for file deletion");
-        
+
     }
 
     public static void main(String[] args) throws Exception {
@@ -65,10 +70,21 @@ public class DeleteFiles {
                 .toInstant();
 
         for (Path dir : dirs) {
-            System.out.println("Deleting files older than: " + days + " days at: " + dir);
-            deleteStart(dir, time);
+            System.out.println("Deleting marked files at: " + dir);
+            deleteStart(dir);
         }
-        Thread.sleep(1000);
+
+        for (Path dir : dirs) {
+            System.out.println("Marking files " + SUFFIX + " older than: " + days + " days at: " + dir);
+            markForDeletion(dir, time);
+        }
+        System.out.println("Deleted:"+totalDeleted+" Marked:"+totalMarked);
+         System.out.print("Exiting");
+        for(int i = 0; i < 3; i++){
+            Thread.sleep(1000);
+            System.out.print(".");
+        }
+        
 
     }
 
@@ -97,41 +113,131 @@ public class DeleteFiles {
         return false;
     }
 
-    public static void deleteStart(Path p, Instant maxTime) throws IOException {
+    public static Path getFreePathForRename(Path p) {
+
+        String pathName = p.getName(p.getNameCount() - 1).toString();
+        int counter = 0;
+        String name = SUFFIX;
+        while (true) {
+
+            Path sibling = p.resolveSibling(pathName + name);
+            if (!Files.exists(sibling)) {
+                return sibling;
+            }
+            counter++;
+            name = counter + SUFFIX;
+        }
+    }
+
+    public static void doMark(Path p) {
+        if (!DEBUG) {
+            try {
+
+                Files.move(p, getFreePathForRename(p));
+            } catch (Exception ex) {
+                System.err.println(ex);
+            }
+        }
+        if (DEBUG) {
+            System.out.println(p + " -> " + getFreePathForRename(p));
+        }
+    }
+
+    public static void deleteStart(Path p) throws IOException {
         if (!Files.isDirectory(p)) {// file or link
             throw new IOException(p + " is not a directory");
         }
 
         for (Path path : new DirStream(p)) {
-            delete(path, maxTime);
+            DeleteFiles.delete(path);
         }
 
     }
 
-    public static boolean delete(Path p, Instant maxTime) throws IOException {
+    public static void markingStart(Path p, Instant time) throws IOException {
+        if (!Files.isDirectory(p)) {// file or link
+            throw new IOException(p + " is not a directory");
+        }
+
+        for (Path path : new DirStream(p)) {
+            DeleteFiles.markForDeletion(path, time);
+        }
+
+    }
+
+    public static boolean delete(Path p) throws IOException {
         boolean deleted = false;
         if (p == null) {
             return deleted;
         }
+
+        boolean suffixMatch = p.toString().endsWith(SUFFIX);
+
         if (!Files.isDirectory(p)) {// file or link
-            if (timeBefore(p, maxTime)) {
+
+            if (suffixMatch) {
                 deleted = doDelete(p);
+                if (deleted) {
+                    totalDeleted++;
+                }
+                return deleted;
             }
             return deleted;
+        }
+
+        // is directory
+        DirStream dirStream = new DirStream(p);
+
+        for (Path path : dirStream) {
+            if (delete(path)) {
+                dirStream.incrementCounter();
+            }
+        }
+        if (suffixMatch && dirStream.counterMatchVisited()) {
+            deleted = doDelete(p);
+            if (deleted) {
+                totalDeleted++;
+            }
+        }
+
+        return deleted;
+    }
+
+    public static boolean markForDeletion(Path p, Instant maxTime) throws IOException {
+        boolean marked = false;
+        if (p == null) {
+            return false;
+        }
+        if (p.toString().endsWith(SUFFIX)) {//allready marked
+            return true;
+        }
+        if (!Files.isDirectory(p)) {// file or link
+            if (timeBefore(p, maxTime)) {
+                doMark(p);
+                marked = true;
+                if (marked) {
+                    totalMarked++;
+                }
+            }
+            return marked;
         }
 
         DirStream dirStream = new DirStream(p);
 
         for (Path path : dirStream) {
-            if (delete(path, maxTime)) {
-                dirStream.incrementDeleted();
+            if (DeleteFiles.markForDeletion(path, maxTime)) {
+                dirStream.incrementCounter();
             }
         }
-        if (dirStream.deletedMatchVisited() && timeBefore(p, maxTime)) {
-            deleted = doDelete(p);
+        if (dirStream.counterMatchVisited() && timeBefore(p, maxTime)) {
+            doMark(p);
+            marked = true;
+            if (marked) {
+                totalMarked++;
+            }
         }
 
-        return deleted;
+        return marked;
 
     }
 }

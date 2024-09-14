@@ -14,6 +14,7 @@ public class DeleteTest {
     public static void main(String[] args) throws IOException{
         DeleteFiles.DEBUG = false;
         Path dir = Paths.get(System.getProperty("java.io.tmpdir"));
-        DeleteFiles.deleteStart(dir, ZonedDateTime.now().minusMonths(1).toInstant());
+        DeleteFiles.markingStart(dir, ZonedDateTime.now().minusDays(10).toInstant());
+        DeleteFiles.deleteStart(dir);
     }
 }
