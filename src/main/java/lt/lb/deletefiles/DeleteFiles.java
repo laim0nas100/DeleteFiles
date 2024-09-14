@@ -78,20 +78,19 @@ public class DeleteFiles {
             System.out.println("Marking files " + SUFFIX + " older than: " + days + " days at: " + dir);
             markForDeletion(dir, time);
         }
-        System.out.println("Deleted:"+totalDeleted+" Marked:"+totalMarked);
-         System.out.print("Exiting");
-        for(int i = 0; i < 3; i++){
+        System.out.println("Deleted:" + totalDeleted + " Marked:" + totalMarked);
+        System.out.print("Exiting");
+        for (int i = 0; i < 3; i++) {
             Thread.sleep(1000);
             System.out.print(".");
         }
-        
 
     }
 
     public static boolean timeBefore(Path p, Instant test) throws IOException {
         FileTime time = Files.getLastModifiedTime(p);
         if (time == null || test == null) {
-            return true;
+            return false;
         }
         return time.toInstant().isBefore(test);
     }
@@ -129,18 +128,22 @@ public class DeleteFiles {
         }
     }
 
-    public static void doMark(Path p) {
-        if (!DEBUG) {
-            try {
-
-                Files.move(p, getFreePathForRename(p));
-            } catch (Exception ex) {
-                System.err.println(ex);
+    public static boolean doMark(Path p) {
+        boolean marked = false;
+        Path path = null;
+        try {
+            path = getFreePathForRename(p);
+            if (!DEBUG) {
+                Files.move(p, path);
             }
+            marked = true;
+        } catch (Exception ex) {
+            System.err.println(ex);
         }
-        if (DEBUG) {
-            System.out.println(p + " -> " + getFreePathForRename(p));
+        if (DEBUG || marked) {
+            System.out.println(p + " -> " + path);
         }
+        return marked;
     }
 
     public static void deleteStart(Path p) throws IOException {
@@ -213,8 +216,7 @@ public class DeleteFiles {
         }
         if (!Files.isDirectory(p)) {// file or link
             if (timeBefore(p, maxTime)) {
-                doMark(p);
-                marked = true;
+                marked = doMark(p);
                 if (marked) {
                     totalMarked++;
                 }
@@ -230,8 +232,7 @@ public class DeleteFiles {
             }
         }
         if (dirStream.counterMatchVisited() && timeBefore(p, maxTime)) {
-            doMark(p);
-            marked = true;
+            marked = doMark(p);
             if (marked) {
                 totalMarked++;
             }
