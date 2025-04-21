@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  *
@@ -20,7 +21,7 @@ public class DeleteFiles {
 
     private static final String SUFFIX = "_2BREMOVED";
 
-    public static void prinUsageExit() {
+    public static void printUsageExit() {
         printUsage();
         try {
             Thread.sleep(1000);
@@ -44,7 +45,7 @@ public class DeleteFiles {
     public static void main(String[] args) throws Exception {
 
         if (args.length < 2) {
-            prinUsageExit();
+            printUsageExit();
             return;
         }
 
@@ -58,12 +59,12 @@ public class DeleteFiles {
                 }
             } catch (Exception ex) {
                 System.out.println("Error:" + ex.getMessage());
-                prinUsageExit();
+                printUsageExit();
             }
         }
 
         if (dirs.isEmpty()) {
-            prinUsageExit();
+            printUsageExit();
         }
         Instant time = ZonedDateTime.now()
                 .minusDays(days)
@@ -76,7 +77,7 @@ public class DeleteFiles {
 
         for (Path dir : dirs) {
             System.out.println("Marking files " + SUFFIX + " older than: " + days + " days at: " + dir);
-            markForDeletion(dir, time);
+            markingStart(dir, time);
         }
         System.out.println("Deleted:" + totalDeleted + " Marked:" + totalMarked);
         System.out.print("Exiting");
@@ -87,12 +88,15 @@ public class DeleteFiles {
 
     }
 
-    public static boolean timeBefore(Path p, Instant test) throws IOException {
-        FileTime time = Files.getLastModifiedTime(p);
-        if (time == null || test == null) {
+    public static boolean timeBefore(PathAttributes p, Instant test) throws IOException {
+        if (test == null) {
             return false;
         }
-        return time.toInstant().isBefore(test);
+        return Optional.ofNullable(p)
+                .map(m -> m.attributes)
+                .map(m -> m.lastModifiedTime())
+                .map(time -> time.toInstant().isBefore(test))
+                .orElse(false);
     }
 
     public static boolean doDelete(Path p) {
@@ -151,7 +155,7 @@ public class DeleteFiles {
             throw new IOException(p + " is not a directory");
         }
 
-        for (Path path : new DirStream(p)) {
+        for (PathAttributes path : new DirStream(p)) {
             DeleteFiles.delete(path);
         }
 
@@ -162,18 +166,19 @@ public class DeleteFiles {
             throw new IOException(p + " is not a directory");
         }
 
-        for (Path path : new DirStream(p)) {
+        for (PathAttributes path : new DirStream(p)) {
             DeleteFiles.markForDeletion(path, time);
         }
 
     }
 
-    public static boolean delete(Path p) throws IOException {
+    public static boolean delete(PathAttributes pa) throws IOException {
         boolean deleted = false;
-        if (p == null) {
+        if (pa == null) {
             return deleted;
         }
 
+        Path p = pa.path;
         boolean suffixMatch = p.toString().endsWith(SUFFIX);
 
         if (!Files.isDirectory(p)) {// file or link
@@ -191,7 +196,7 @@ public class DeleteFiles {
         // is directory
         DirStream dirStream = new DirStream(p);
 
-        for (Path path : dirStream) {
+        for (PathAttributes path : dirStream) {
             if (delete(path)) {
                 dirStream.incrementCounter();
             }
@@ -206,16 +211,17 @@ public class DeleteFiles {
         return deleted;
     }
 
-    public static boolean markForDeletion(Path p, Instant maxTime) throws IOException {
+    public static boolean markForDeletion(PathAttributes pa, Instant maxTime) throws IOException {
         boolean marked = false;
-        if (p == null) {
+        if (pa == null) {
             return false;
         }
+        Path p = pa.path;
         if (p.toString().endsWith(SUFFIX)) {//allready marked
             return true;
         }
         if (!Files.isDirectory(p)) {// file or link
-            if (timeBefore(p, maxTime)) {
+            if (timeBefore(pa, maxTime)) {
                 marked = doMark(p);
                 if (marked) {
                     totalMarked++;
@@ -226,12 +232,12 @@ public class DeleteFiles {
 
         DirStream dirStream = new DirStream(p);
 
-        for (Path path : dirStream) {
+        for (PathAttributes path : dirStream) {
             if (DeleteFiles.markForDeletion(path, maxTime)) {
                 dirStream.incrementCounter();
             }
         }
-        if (dirStream.counterMatchVisited() && timeBefore(p, maxTime)) {
+        if (dirStream.counterMatchVisited() && timeBefore(pa, maxTime)) {
             marked = doMark(p);
             if (marked) {
                 totalMarked++;

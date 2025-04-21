@@ -18,10 +18,10 @@ import java.util.Set;
  *
  * @author laim0nas100
  */
-public class DirStream implements FileVisitor<Path>, Iterable<Path> {
+public class DirStream implements FileVisitor<Path>, Iterable<PathAttributes> {
 
     private static final Set<FileVisitOption> emptyOptions = new HashSet<>();
-    private List<Path> visited = new ArrayList<>();
+    private List<PathAttributes> visited = new ArrayList<>();
     private int counter;
 
     public DirStream(Path path) throws IOException {
@@ -43,7 +43,7 @@ public class DirStream implements FileVisitor<Path>, Iterable<Path> {
 
     @Override
     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-        visited.add(file);
+        visited.add(new PathAttributes(file, attrs));
         return FileVisitResult.CONTINUE;
     }
 
@@ -58,7 +58,7 @@ public class DirStream implements FileVisitor<Path>, Iterable<Path> {
     }
 
     @Override
-    public Iterator<Path> iterator() {
+    public Iterator<PathAttributes> iterator() {
         return visited.iterator();
     }
 
